@@ -1,3 +1,215 @@
+-- Place this in StarterPlayerScripts or StarterCharacterScripts
+local player = game:GetService("Players").LocalPlayer
+local userInputService = game:GetService("UserInputService")
+local runService = game:GetService("RunService")
+local starterGui = game:GetService("StarterGui")
+
+-- Configuration
+local TOGGLE_KEY = Enum.KeyCode.E
+local MIN_SPEED = 20
+local MAX_SPEED = 1000
+local MIN_MARGIN = 1
+local MAX_MARGIN = 200
+
+-- Fly variables
+local flySpeed = 50 -- Default speed
+local flying = false
+local bodyGyro = nil
+local bodyVelocity = nil
+local speedChangeMargin = 20 -- Default margin for speed change
+
+-- Notification function
+local function notify(message)
+    starterGui:SetCore("SendNotification", {
+        Title = "Fly System",
+        Text = message,
+        Duration = 2
+    })
+end
+
+-- Fly functions
+local function startFlying()
+    if flying then return end
+
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:WaitForChild("Humanoid")
+    humanoid.PlatformStand = true
+
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.P = 10000
+    bodyGyro.maxTorque = Vector3.new(100000, 100000, 100000)
+    bodyGyro.cframe = character.HumanoidRootPart.CFrame
+    bodyGyro.Parent = character.HumanoidRootPart
+
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.maxForce = Vector3.new(100000, 100000, 100000)
+    bodyVelocity.Parent = character.HumanoidRootPart
+
+    flying = true
+    notify("Fly: ON\nSpeed: " .. flySpeed)
+end
+
+local function stopFlying()
+    if not flying then return end
+
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid.PlatformStand = false
+        end
+
+        if character:FindFirstChild("HumanoidRootPart") then
+            for _, obj in ipairs(character.HumanoidRootPart:GetChildren()) do
+                if obj:IsA("BodyGyro") or obj:IsA("BodyVelocity") then
+                    obj:Destroy()
+                end
+            end
+        end
+    end
+
+    flying = false
+    notify("Fly: OFF")
+end
+
+local function toggleFly()
+    if flying then
+        stopFlying()
+    else
+        startFlying()
+    end
+end
+
+-- Flight control system
+local function updateFlight()
+    if not flying then return end
+
+    local character = player.Character
+    if not character then return end
+
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+
+    local direction = Vector3.new()
+
+    if userInputService:IsKeyDown(Enum.KeyCode.W) then
+        direction = direction + (rootPart.CFrame.LookVector * flySpeed)
+    end
+    if userInputService:IsKeyDown(Enum.KeyCode.S) then
+        direction = direction - (rootPart.CFrame.LookVector * flySpeed)
+    end
+    if userInputService:IsKeyDown(Enum.KeyCode.A) then
+        direction = direction - (rootPart.CFrame.RightVector * flySpeed)
+    end
+    if userInputService:IsKeyDown(Enum.KeyCode.D) then
+        direction = direction + (rootPart.CFrame.RightVector * flySpeed)
+    end
+    if userInputService:IsKeyDown(Enum.KeyCode.Space) then
+        direction = direction + Vector3.new(0, flySpeed, 0)
+    end
+    if userInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        direction = direction - Vector3.new(0, flySpeed, 0)
+    end
+
+    if bodyVelocity then
+        bodyVelocity.velocity = direction
+    end
+
+    if bodyGyro then
+        bodyGyro.cframe = workspace.CurrentCamera.CFrame
+    end
+end
+
+-- Track which keys were pressed to prevent spamming notifications
+local keysPressed = {}
+
+userInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    local keyCode = input.KeyCode
+
+    if keyCode == TOGGLE_KEY then
+        toggleFly()
+    elseif keyCode == Enum.KeyCode.F1 then
+        speedChangeMargin = math.clamp(speedChangeMargin - 5, MIN_MARGIN, MAX_MARGIN)
+        notify("Margin decreased: " .. speedChangeMargin)
+    elseif keyCode == Enum.KeyCode.F2 then
+        speedChangeMargin = math.clamp(speedChangeMargin + 5, MIN_MARGIN, MAX_MARGIN)
+        notify("Margin increased: " .. speedChangeMargin)
+    elseif keyCode == Enum.KeyCode.LeftShift or keyCode == Enum.KeyCode.RightShift then
+        if not keysPressed[keyCode] then
+            keysPressed[keyCode] = true
+            flySpeed = math.clamp(flySpeed + speedChangeMargin, MIN_SPEED, MAX_SPEED)
+            notify("Speed increased: " .. flySpeed)
+        end
+    elseif keyCode == Enum.KeyCode.LeftAlt or keyCode == Enum.KeyCode.RightAlt then
+        if not keysPressed[keyCode] then
+            keysPressed[keyCode] = true
+            flySpeed = math.clamp(flySpeed - speedChangeMargin, MIN_SPEED, MAX_SPEED)
+            notify("Speed decreased: " .. flySpeed)
+        end
+    end
+end)
+
+userInputService.InputEnded:Connect(function(input, _)
+    local keyCode = input.KeyCode
+    if keysPressed[keyCode] then
+        keysPressed[keyCode] = nil
+    end
+end)
+
+-- Handle character respawns
+player.CharacterAdded:Connect(function(character)
+    if flying then
+        character:WaitForChild("Humanoid")
+        startFlying()
+    end
+end)
+-- LocalScript
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = game.Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+local noclip = false
+
+-- Update character when respawning
+player.CharacterAdded:Connect(function(char)
+    character = char
+    humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+end)
+
+-- Toggle noclip when pressing F3
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F3 then
+        noclip = not noclip
+        print("Noclip:", noclip)
+    end
+end)
+
+-- Noclip logic
+RunService.Stepped:Connect(function()
+    if noclip and humanoidRootPart then
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    elseif character then
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end)
+
+-- Main flight update loop
+runService.Heartbeat:Connect(updateFlight)
 -- XmodzProject Mod Menu
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
